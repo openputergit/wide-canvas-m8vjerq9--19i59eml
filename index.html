@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WealthManagementAI - Financial Assistant</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .neubrutalism {
+            border: 3px solid #000;
+            box-shadow: 5px 5px 0px #000;
+            transition: all 0.2s ease;
+        }
+        .neubrutalism:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 7px 7px 0px #000;
+        }
+        .neubrutalism-sm {
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0px #000;
+            transition: all 0.2s ease;
+        }
+        .neubrutalism-sm:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0px #000;
+        }
+        .upload-zone {
+            border: 3px dashed #000;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover {
+            background: #f0f0f0;
+            border-color: #0066cc;
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+        }
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 10px;
+            border-radius: 0px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #e6f3ff;
+            margin-left: auto;
+            border-right: 3px solid #000;
+            border-bottom: 3px solid #000;
+        }
+        .bot-message {
+            background-color: #f0f0f0;
+            margin-right: auto;
+            border-left: 3px solid #000;
+            border-bottom: 3px solid #000;
+        }
+        .typing-indicator {
+            display: inline-block;
+        }
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #888;
+            border-radius: 50%;
+            margin-right: 3px;
+            animation: typing 1s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .alumni-card {
+            transition: all 0.2s ease;
+        }
+        .alumni-card:hover {
+            transform: translateY(-5px);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #000;
+            border: 2px solid #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Process steps */
+        .process-step {
+            position: relative;
+        }
+        .process-step:not(:last-child):after {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 40px;
+            height: calc(100% - 30px);
+            width: 3px;
+            background-color: #000;
+        }
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .chat-container {
+                height: 350px;
+            }
+            .chat-message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body class="bg-[#f8f9fa] min-h-screen">
+    <div id="app">
+        <nav class="bg-white neubrutalism m-4 p-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <h1 class="text-2xl font-bold">WealthManagementAI</h1>
+                <div class="flex flex-wrap gap-3 mt-4 md:mt-0 justify-center">
+                    <button @click="activeTab = 'chat'" :class="{'bg-[#0066cc] text-white': activeTab === 'chat', 'bg-[#e6f3ff]': activeTab !== 'chat'}" class="neubrutalism-sm px-3 py-1.5 text-sm">Financial Assistant</button>
+                    <button @click="activeTab = 'documents'" :class="{'bg-[#0066cc] text-white': activeTab === 'documents', 'bg-[#e6f3ff]': activeTab !== 'documents'}" class="neubrutalism-sm px-3 py-1.5 text-sm">Document Analysis</button>
+                    <button @click="activeTab = 'process'" :class="{'bg-[#0066cc] text-white': activeTab === 'process', 'bg-[#e6f3ff]': activeTab !== 'process'}" class="neubrutalism-sm px-3 py-1.5 text-sm">Process Lookup</button>
+                    <button @click="activeTab = 'alumni'" :class="{'bg-[#0066cc] text-white': activeTab === 'alumni', 'bg-[#e6f3ff]': activeTab !== 'alumni'}" class="neubrutalism-sm px-3 py-1.5 text-sm">Alumni Database</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="container mx-auto p-4">
+            <!-- Chat Interface -->
+            <div v-if="activeTab === 'chat'" class="neubrutalism bg-white p-6">
+                <h2 class="text-xl font-bold mb-4">Financial Assistant</h2>
+                <div class="chat-container p-4 neubrutalism bg-[#fbfbfb] mb-4">
+                    <div v-if="chatMessages.length === 0" class="text-center text-gray-500 my-20">
+                        <i class="bi bi-chat-dots text-5xl mb-3 block"></i>
+                        <p>Ask me anything about banking processes or documents</p>
+                    </div>
+                    <div v-for="(message, index) in chatMessages" :key="index" 
+                         :class="['chat-message', message.sender === 'user' ? 'user-message' : 'bot-message']">
+                        <p>{{ message.text }}</p>
+                    </div>
+                    <div v-if="isTyping" class="chat-message bot-message">
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        v-model="userInput" 
+                        @keyup.enter="sendMessage"
+                        placeholder="Type your question here..." 
+                        class="neubrutalism flex-1 p-3">
+                    <button @click="sendMessage" class="neubrutalism bg-[#0066cc] text-white px-6 py-2">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600 font-semibold">Suggested questions:</p>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <button @click="quickQuestion('How do I apply for a mortgage?')" class="neubrutalism-sm bg-[#e6f3ff] px-3 py-1 text-sm">How do I apply for a mortgage?</button>
+                        <button @click="quickQuestion('What are the steps for an RRSP withdrawal?')" class="neubrutalism-sm bg-[#e6f3ff] px-3 py-1 text-sm">What are the steps for an RRSP withdrawal?</button>
+                        <button @click="quickQuestion('In which screens can I find fund transfer settings?')" class="neubrutalism-sm bg-[#e6f3ff] px-3 py-1 text-sm">Where can I find fund transfer settings?</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Analysis Section -->
+            <div v-if="activeTab === 'documents'" class="neubrutalism bg-white p-6">
+                <h2 class="text-xl font-bold mb-4">Document Analysis</h2>
+                <div class="upload-zone p-8 text-center">
+                    <i class="bi bi-cloud-upload text-4xl"></i>
+                    <p class="mt-2">Drag and drop your financial documents here</p>
+                    <p class="text-sm text-gray-500">Supported formats: PDF, DOCX, CSV</p>
+                    <input type="file" id="fileUpload" class="hidden" accept=".pdf,.docx,.csv" @change="handleFileUpload">
+                    <button @click="triggerFileUpload" class="neubrutalism bg-[#0066cc] text-white px-4 py-2 mt-4">
+                        Upload Document
+                    </button>
+                </div>
+                
+                <div v-if="uploadedDocuments.length > 0" class="mt-6">
+                    <h3 class="font-bold mb-3">Uploaded Documents</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div v-for="(doc, index) in uploadedDocuments" :key="index" class="neubrutalism bg-[#f5f5f5] p-4">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="font-semibold">{{ doc.name }}</p>
+                                    <p class="text-sm text-gray-600">{{ doc.date }}</p>
+                                </div>
+                                <button @click="analyzeDocument(doc)" class="neubrutalism-sm bg-[#0066cc] text-white px-3 py-1">
+                                    Analyze
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-if="documentAnalysis" class="mt-6 neubrutalism p-4">
+                    <h3 class="font-bold mb-3">Document Analysis Results</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="neubrutalism bg-[#e6f3ff] p-3">
+                            <h4 class="font-semibold">Key Points</h4>
+                            <ul class="list-disc ml-5 mt-2">
+                                <li v-for="(point, idx) in documentAnalysis.keyPoints" :key="idx">{{ point }}</li>
+                            </ul>
+                        </div>
+                        <div class="neubrutalism bg-[#e6f3ff] p-3">
+                            <h4 class="font-semibold">Financial Data</h4>
+                            <div class="mt-2">
+                                <div v-for="(value, key, idx) in documentAnalysis.financialData" :key="idx" class="flex justify-between mb-1">
+                                    <span>{{ key }}:</span>
+                                    <span class="font-semibold">${{ value }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 neubrutalism bg-[#e6f3ff] p-3">
+                        <h4 class="font-semibold">Summary</h4>
+                        <p class="mt-2">{{ documentAnalysis.summary }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Process Visualization Section -->
+            <div v-if="activeTab === 'process'" class="neubrutalism bg-white p-6">
+                <h2 class="text-xl font-bold mb-4">Process Lookup</h2>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <div class="md:w-1/3">
+                        <div class="neubrutalism bg-[#f5f5f5] p-4">
+                            <h3 class="font-bold mb-3">Find Banking Process</h3>
+                            <div class="flex gap-2 mb-4">
+                                <input type="text" 
+                                    v-model="processSearch" 
+                                    placeholder="Search for a process or issue..." 
+                                    class="neubrutalism flex-1 p-2"
+                                    @keyup.enter="searchProcesses">
+                                <button @click="searchProcesses" class="neubrutalism-sm bg-[#0066cc] text-white px-3 py-1">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                            
+                            <p class="text-sm text-gray-600 mb-2">Common Processes:</p>
+                            <div class="space-y-2">
+                                <button 
+                                    v-for="proc in commonProcesses" 
+                                    :key="proc.value"
+                                    @click="selectedProcess = proc.value" 
+                                    :class="{'bg-[#0066cc] text-white': selectedProcess === proc.value, 'bg-white': selectedProcess !== proc.value}"
+                                    class="neubrutalism-sm w-full p-2 text-left text-sm">
+                                    {{ proc.name }}
+                                </button>
+                            </div>
+                            
+                            <div v-if="processList.length > 0" class="mt-4">
+                                <h4 class="font-semibold text-sm mb-2">Search Results:</h4>
+                                <div v-for="(proc, idx) in processList" :key="idx" 
+                                     @click="selectedProcess = proc.value"
+                                     :class="{'bg-[#0066cc] text-white': selectedProcess === proc.value, 'bg-white': selectedProcess !== proc.value}"
+                                     class="neubrutalism-sm p-2 mb-2 cursor-pointer text-sm">
+                                    {{ proc.name }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="md:w-2/3 mt-4 md:mt-0">
+                        <div class="neubrutalism bg-[#f5f5f5] p-4">
+                            <h3 class="font-bold mb-3">{{ getProcessTitle(selectedProcess) }}</h3>
+                            
+                            <div v-if="isProcessLoading" class="py-10 text-center">
+                                <div class="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                                <p class="mt-2 text-gray-600">Loading process details...</p>
+                            </div>
+                            
+                            <div v-else class="relative">
+                                <div v-for="(step, idx) in getProcessSteps()" :key="idx" class="mb-6 process-step">
+                                    <div class="neubrutalism bg-white p-3">
+                                        <div class="flex items-center">
+                                            <div class="neubrutalism-sm bg-[#0066cc] text-white w-8 h-8 flex items-center justify-center rounded-full mr-3 z-10">
+                                                {{ idx + 1 }}
+                                            </div>
+                                            <h4 class="font-semibold">{{ step.title }}</h4>
+                                        </div>
+                                        <p class="mt-2 ml-11">{{ step.description }}</p>
+                                        
+                                        <div v-if="step.screenshot" class="mt-3 ml-11">
+                                            <img :src="step.screenshot" alt="Process screenshot" class="neubrutalism w-full max-w-lg">
+                                        </div>
+                                        
+                                        <div v-if="step.location" class="mt-3 ml-11 neubrutalism-sm bg-[#f8e8b0] p-2">
+                                            <p class="text-sm"><i class="bi bi-geo-alt"></i> <strong>Location:</strong> {{ step.location }}</p>
+                                        </div>
+                                        
+                                        <div v-if="step.tips" class="mt-3 ml-11 neubrutalism-sm bg-[#e6f3ff] p-2">
+                                            <p class="text-sm"><i class="bi bi-lightbulb"></i> <strong>Tip:</strong> {{ step.tips }}</p>
+                                        </div>
+                                        
+                                        <div v-if="step.troubleshooting" class="mt-3 ml-11 neubrutalism-sm bg-[#fcebe9] p-2">
+                                            <p class="text-sm"><i class="bi bi-exclamation-triangle"></i> <strong>Troubleshooting:</strong> {{ step.troubleshooting }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alumni Database Section -->
+            <div v-if="activeTab === 'alumni'" class="neubrutalism bg-white p-6">
+                <h2 class="text-xl font-bold mb-4">Alumni Database Management</h2>
+                
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="md:w-1/3">
+                        <div class="neubrutalism bg-[#f5f5f5] p-4 mb-4">
+                            <h3 class="font-bold mb-3">Data Import</h3>
+                            <div class="upload-zone p-4 text-center">
+                                <i class="bi bi-file-earmark-spreadsheet text-2xl"></i>
+                                <p class="mt-2 text-sm">Upload Alumni CSV Data</p>
+                                <input type="file" id="csvUpload" class="hidden" accept=".csv" @change="handleCSVUpload">
+                                <button @click="triggerCSVUpload" class="neubrutalism-sm bg-[#0066cc] text-white px-3 py-1 mt-3 text-sm">
+                                    Import CSV
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="neubrutalism bg-[#f5f5f5] p-4">
+                            <h3 class="font-bold mb-3">Filters</h3>
+                            
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-1">Region/Emirate</label>
+                                <select v-model="alumniFilters.region" class="neubrutalism w-full p-2 text-sm">
+                                    <option value="">All Regions</option>
+                                    <option v-for="region in regions" :key="region" :value="region">{{ region }}</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-1">Industry</label>
+                                <select v-model="alumniFilters.industry" class="neubrutalism w-full p-2 text-sm">
+                                    <option value="">All Industries</option>
+                                    <option v-for="industry in industries" :key="industry" :value="industry">{{ industry }}</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-1">Stay Period</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="number" v-model="alumniFilters.yearFrom" placeholder="From" class="neubrutalism p-2 text-sm">
+                                    <input type="number" v-model="alumniFilters.yearTo" placeholder="To" class="neubrutalism p-2 text-sm">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-1">Hostel</label>
+                                <select v-model="alumniFilters.hostel" class="neubrutalism w-full p-2 text-sm">
+                                    <option value="">All Hostels</option>
+                                    <option v-for="hostel in hostels" :key="hostel" :value="hostel">{{ hostel }}</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="block text-sm font-medium mb-1">Search</label>
+                                <input type="text" v-model="alumniFilters.search" placeholder="Search name, email..." class="neubrutalism w-full p-2 text-sm">
+                            </div>
+                            
+                            <button @click="applyAlumniFilters" class="neubrutalism-sm bg-[#0066cc] text-white px-4 py-2 w-full mt-2">
+                                Apply Filters
+                            </button>
+                        </div>
+                        
+                        <div class="neubrutalism bg-[#f5f5f5] p-4 mt-4">
+                            <h3 class="font-bold mb-3">Analytics</h3>
+                            <canvas id="alumniChart" height="200"></canvas>
+                            
+                            <div class="grid grid-cols-2 gap-2 mt-4">
+                                <div class="neubrutalism-sm bg-white p-2 text-center">
+                                    <p class="text-sm text-gray-600">Total Alumni</p>
+                                    <p class="font-bold text-lg">{{ alumniData.length }}</p>
+                                </div>
+                                <div class="neubrutalism-sm bg-white p-2 text-center">
+                                    <p class="text-sm text-gray-600">Regions</p>
+                                    <p class="font-bold text-lg">{{ regions.length }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="md:w-2/3">
+                        <div class="neubrutalism bg-[#f5f5f5] p-4">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+                                <h3 class="font-bold">Alumni List ({{ filteredAlumni.length }} of {{ alumniData.length }})</h3>
+                                <div class="flex gap-2">
+                                    <button @click="exportAlumniData" class="neubrutalism-sm bg-[#e6f3ff] px-3 py-1 text-sm">
+                                        <i class="bi bi-download mr-1"></i> Export
+                                    </button>
+                                    <button @click="showAddAlumniForm = !showAddAlumniForm" class="neubrutalism-sm bg-[#0066cc] text-white px-3 py-1 text-sm">
+                                        <i class="bi bi-plus-lg mr-1"></i> Add New
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Add Alumni Form -->
+                            <div v-if="showAddAlumniForm" class="neubrutalism bg-white p-4 mb-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <h4 class="font-semibold">Add New Alumni</h4>
+                                    <button @click="showAddAlumniForm = false" class="text-gray-600 hover:text-gray-800">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Name*</label>
+                                        <input type="text" v-model="newAlumni.name" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Email*</label>
+                                        <input type="email" v-model="newAlumni.email" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Region/Emirate</label>
+                                        <input type="text" v-model="newAlumni.region" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Contact Number</label>
+                                        <input type="text" v-model="newAlumni.contact" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Industry</label>
+                                        <input type="text" v-model="newAlumni.industry" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Period of Stay (MM/YYYY - MM/YYYY)</label>
+                                        <input type="text" v-model="newAlumni.period" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">MMA Hostel</label>
+                                        <input type="text" v-model="newAlumni.hostel" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium mb-1">Blood Group</label>
+                                        <input type="text" v-model="newAlumni.bloodGroup" class="neubrutalism w-full p-2 text-sm">
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <label class="block text-sm font-medium mb-1">Local Address (UAE)</label>
+                                    <textarea v-model="newAlumni.localAddress" class="neubrutalism w-full p-2 text-sm" rows="2"></textarea>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <label class="block text-sm font-medium mb-1">Permanent Address (India)</label>
+                                    <textarea v-model="newAlumni.permanentAddress" class="neubrutalism w-full p-2 text-sm" rows="2"></textarea>
+                                </div>
+                                
+                                <div class="flex justify-end gap-2 mt-4">
+                                    <button @click="showAddAlumniForm = false" class="neubrutalism-sm bg-gray-200 px-4 py-1.5 text-sm">
+                                        Cancel
+                                    </button>
+                                    <button @click="addNewAlumni" class="neubrutalism-sm bg-[#0066cc] text-white px-4 py-1.5 text-sm">
+                                        Save Alumni
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- View controls -->
+                            <div class="flex justify-between items-center mb-3">
+                                <div class="flex items-center gap-2">
+                                    <button @click="viewMode = 'grid'" :class="{'bg-[#0066cc] text-white': viewMode === 'grid', 'bg-white': viewMode !== 'grid'}" class="neubrutalism-sm p-1.5">
+                                        <i class="bi bi-grid-3x3"></i>
+                                    </button>
+                                    <button @click="viewMode = 'list'" :class="{'bg-[#0066cc] text-white': viewMode === 'list', 'bg-white': viewMode !== 'list'}" class="neubrutalism-sm p-1.5">
+                                        <i class="bi bi-list-ul"></i>
+                                    </button>
+                                </div>
+                                <div class="flex items-center">
+                                    <label class="text-sm mr-2">Sort:</label>
+                                    <select v-model="alumniSort" @change="applySorting" class="neubrutalism-sm p-1.5 text-sm">
+                                        <option value="nameAsc">Name (A-Z)</option>
+                                        <option value="nameDesc">Name (Z-A)</option>
+                                        <option value="recent">Recently Added</option>
+                                        <option value="region">Region</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div v-if="alumniLoading" class="text-center py-10">
+                                <div class="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-600">Loading alumni data...</p>
+                            </div>
+                            
+                            <div v-else-if="filteredAlumni.length === 0" class="text-center py-10">
+                                <i class="bi bi-people text-4xl text-gray-400"></i>
+                                <p class="mt-2 text-gray-600">No alumni records found. Import data or add manually.</p>
+                            </div>
+                            
+                            <!-- Grid view -->
+                            <div v-else-if="viewMode === 'grid'" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div v-for="(alumni, idx) in filteredAlumni" :key="idx" class="neubrutalism bg-white p-4 alumni-card">
+                                    <div class="flex justify-between">
+                                        <h4 class="font-semibold">{{ alumni.Name }}</h4>
+                                        <div class="flex gap-2">
+                                            <button @click="viewAlumniDetails(alumni)" class="text-blue-600 hover:text-blue-800">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button @click="editAlumni(alumni)" class="text-gray-600 hover:text-gray-800">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm text-gray-600">{{ alumni.Email }}</p>
+                                    <div class="mt-2 grid grid-cols-2 gap-x-2 text-sm">
+                                        <div><span class="font-medium">Region:</span> {{ alumni['Emirate/Region of Living'] || 'N/A' }}</div>
+                                        <div><span class="font-medium">Industry:</span> {{ alumni.Industry || 'N/A' }}</div>
+                                        <div class="mt-1"><span class="font-medium">Period:</span> {{ alumni['Period of stay in MMA (MM/YYYY - MM/YYYY)'] || 'N/A' }}</div>
+                                        <div class="mt-1"><span class="font-medium">Contact:</span> {{ alumni['Local Contact Number'] || 'N/A' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- List view -->
+                            <div v-else-if="viewMode === 'list'" class="overflow-x-auto">
+                                <table class="w-full neubrutalism bg-white">
+                                    <thead>
+                                        <tr class="bg-[#f5f5f5]">
+                                            <th class="p-2 text-left">Name</th>
+                                            <th class="p-2 text-left">Email</th>
+                                            <th class="p-2 text-left">Region</th>
+                                            <th class="p-2 text-left">Industry</th>
+                                            <th class="p-2 text-left">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(alumni, idx) in filteredAlumni" :key="idx" class="border-t border-black">
+                                            <td class="p-2">{{ alumni.Name }}</td>
+                                            <td class="p-2 text-sm">{{ alumni.Email }}</td>
+                                            <td class="p-2">{{ alumni['Emirate/Region of Living'] || 'N/A' }}</td>
+                                            <td class="p-2">{{ alumni.Industry || 'N/A' }}</td>
+                                            <td class="p-2">
+                                                <div class="flex gap-2">
+                                                    <button @click="viewAlumniDetails(alumni)" class="neubrutalism-sm bg-[#e6f3ff] p-1.5">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                    <button @click="editAlumni(alumni)" class="neubrutalism-sm bg-white p-1.5">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div v-if="filteredAlumni.length > 0 && filteredAlumni.length < alumniData.length && !alumniLoading" class="mt-4 flex justify-center">
+                                <button @click="loadMoreAlumni" class="neubrutalism bg-[#e6f3ff] px-4 py-2">
+                                    Load More
+                                </button>
+                            </div>
+                            
+                            <div v-if="filteredAlumni.length > 0" class="mt-4 text-center text-sm text-gray-600">
+                                Showing {{ filteredAlumni.length }} of {{ alumniData.length }} alumni
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Alumni Detail Modal -->
+            <div v-if="selectedAlumni" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="neubrutalism bg-white p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold">Alumni Profile</h3>
+                        <button @click="selectedAlumni = null" class="text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <div class="aspect-square w-full bg-gray-200 neubrutalism flex items-center justify-center">
+                                <i class="bi bi-person text-7xl text-gray-400"></i>
+                            </div>
+                            
+                            <div class="mt-4 neubrutalism bg-[#e6f3ff] p-3">
+                                <h4 class="font-semibold mb-2">Contact Information</h4>
+                                <p><span class="font-medium">Email:</span> {{ selectedAlumni.Email }}</p>
+                                <p><span class="font-medium">Local Contact:</span> {{ selectedAlumni['Local Contact Number'] || 'N/A' }}</p>
+                                <p><span class="font-medium">WhatsApp:</span> {{ selectedAlumni['WhatsApp Number'] || 'N/A' }}</p>
+                                <p><span class="font-medium">India Contact:</span> {{ selectedAlumni['Contact Number (India)'] || 'N/A' }}</p>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <div class="neubrutalism bg-white p-4 mb-4">
+                                <h2 class="text-xl font-bold">{{ selectedAlumni.Name }}</h2>
+                                <p class="text-gray-600">{{ selectedAlumni.Designation || 'Alumni' }} {{ selectedAlumni['Company Name'] ? 'at ' + selectedAlumni['Company Name'] : '' }}</p>
+                                
+                                <div class="mt-4">
+                                    <p><span class="font-medium">Industry:</span> {{ selectedAlumni.Industry || 'N/A' }}</p>
+                                    <p><span class="font-medium">Qualification:</span> {{ selectedAlumni.Qualification || 'N/A' }}</p>
+                                    <p><span class="font-medium">Blood Group:</span> {{ selectedAlumni['Blood Group'] || 'N/A' }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="neubrutalism bg-white p-4 mb-4">
+                                <h4 class="font-semibold mb-2">Address Information</h4>
+                                <p><span class="font-medium">Region:</span> {{ selectedAlumni['Emirate/Region of Living'] || 'N/A' }}</p>
+                                <p><span class="font-medium">Local Address:</span> {{ selectedAlumni['Local Address (UAE)'] || 'N/A' }}</p>
+                                <p><span class="font-medium">Permanent Address:</span> {{ selectedAlumni['Permanent Address (India)'] || 'N/A' }}</p>
+                            </div>
+                            
+                            <div class="neubrutalism bg-white p-4">
+                                <h4 class="font-semibold mb-2">Hostel Information</h4>
+                                <p><span class="font-medium">MMA Period:</span> {{ selectedAlumni['Period of stay in MMA (MM/YYYY - MM/YYYY)'] || 'N/A' }}</p>
+                                <p><span class="font-medium">Hostel:</span> {{ selectedAlumni['Which MMA hostel you were in?'] || 'N/A' }}</p>
+                                <p><span class="font-medium">WhatsApp Group:</span> {{ selectedAlumni['Are you interested to be added UAE MMA Alumni WhatsApp group?'] || 'N/A' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-if="selectedAlumni['Any Message to the committee?']" class="mt-6 neubrutalism bg-[#e6f3ff] p-4">
+                        <h4 class="font-semibold mb-2">Message to Committee</h4>
+                        <p>{{ selectedAlumni['Any Message to the committee?'] }}</p>
+                    </div>
+                    
+                    <div class="flex justify-end gap-3 mt-6">
+                        <button @click="selectedAlumni = null" class="neubrutalism-sm bg-gray-100 px-4 py-2">
+                            Close
+                        </button>
+                        <button @click="editAlumni(selectedAlumni)" class="neubrutalism-sm bg-[#e6f3ff] px-4 py-2">
+                            Edit Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    activeTab: 'chat',
+                    userInput: '',
+                    chatMessages: [],
+                    isTyping: false,
+                    uploadedDocuments: [],
+                    documentAnalysis: null,
+                    selectedProcess: 'loan',
+                    processSearch: '',
+                    isProcessLoading: false,
+                    commonProcesses: [
+                        { name: 'Mortgage Application Process', value: 'loan' },
+                        { name: 'RRSP Withdrawal Process', value: 'rrsp' },
+                        { name: 'Fund Transfer Issues', value: 'transfer' },
+                        { name: 'Account Authentication Problem', value: 'auth' },
+                        { name: 'Credit Card Application Process', value: 'credit' }
+                    ],
+                    processList: [],
+                    alumniData: [],
+                    filteredAlumni: [],
+                    regions: [],
+                    industries: [],
+                    hostels: [],
+                    alumniFilters: {
+                        region: '',
+                        industry: '',
+                        yearFrom: '',
+                        yearTo: '',
+                        hostel: '',
+                        search: ''
+                    },
+                    alumniSort: 'nameAsc',
+                    alumniLoading: false,
+                    showAddAlumniForm: false,
+                    newAlumni: {
+                        name: '',
+                        email: '',
+                        region: '',
+                        contact: '',
+                        industry: '',
+                        period: '',
+                        hostel: '',
+                        bloodGroup: '',
+                        localAddress: '',
+                        permanentAddress: ''
+                    },
+                    selectedAlumni: null,
+                    displayLimit: 10,
+                    viewMode: 'grid',
+                    alumniChart: null
+                }
+            },
+            mounted() {
+                // Welcome message
+                this.simulateResponse("Hello! I'm your banking process assistant. How can I help you today with finding information about banking processes or troubleshooting issues?");
+                
+                // Fetch alumni data from CSV
+                this.fetchAlumniData();
+            },
+            methods: {
+                sendMessage() {
+                    if (!this.userInput.trim()) return;
+                    
+                    // Add user message
+                    this.chatMessages.push({
+                        sender: 'user',
+                        text: this.userInput
+                    });
+                    
+                    const query = this.userInput;
+                    this.userInput = '';
+                    
+                    // Show typing indicator
+                    this.isTyping = true;
+                    
+                    // Simulate response after delay
+                    setTimeout(() => {
+                        this.isTyping = false;
+                        this.generateResponse(query);
+                    }, 1000 + Math.random() * 1000);
+                },
+                
+                simulateResponse(message) {
+                    this.chatMessages.push({
+                        sender: 'bot',
+                        text: message
+                    });
+                    
+                    // Auto scroll to bottom
+                    this.$nextTick(() => {
+                        const chatContainer = document.querySelector('.chat-container');
+                        if (chatContainer) {
+                            chatContainer.scrollTop = chatContainer.scrollHeight;
+                        }
+                    });
+                },
+                
+                generateResponse(query) {
+                    let response = '';
+                    
+                    // Process identification based on query
+                    const queryLower = query.toLowerCase();
+                    
+                    if (queryLower.includes('mortgage') || queryLower.includes('home loan')) {
+                        response = "To apply for a mortgage, you'll need to use the Mortgage Application Process. You can find this in the online banking portal under 'Products > Mortgages > Apply'. Would you like me to show you the detailed steps for this process?";
+                        this.activeTab = 'process';
+                        this.selectedProcess = 'loan';
+                    } 
+                    else if (queryLower.includes('rrsp') && queryLower.includes('withdraw')) {
+                        response = "RRSP withdrawals can be processed through our secure banking portal. You'll find this under 'Investments > RRSP > Withdrawal Options'. I can show you the step-by-step process if you'd like.";
+                        this.activeTab = 'process';
+                        this.selectedProcess = 'rrsp';
+                    }
+                    else if (queryLower.includes('fund') && (queryLower.includes('transfer') || queryLower.includes('issue'))) {
+                        response = "Fund transfer settings and troubleshooting can be found in the 'Payments & Transfers' section of online banking. For specific transfer issues, check the 'Recent Transactions' tab to verify the status. I've pulled up the detailed resolution process for you.";
+                        this.activeTab = 'process';
+                        this.selectedProcess = 'transfer';
+                    }
+                    else if (queryLower.includes('account') && (queryLower.includes('locked') || queryLower.includes('reset') || queryLower.includes('password'))) {
+                        response = "For account authentication issues, you'll need to access the 'Security Center' from the login page. Look for the 'Need Help?' option below the login fields. I can show you the exact steps to resolve this.";
+                        this.activeTab = 'process';
+                        this.selectedProcess = 'auth';
+                    }
+                    else if (queryLower.includes('document') || queryLower.includes('analyze') || queryLower.includes('statement')) {
+                        response = "I'd be happy to help analyze your financial documents. You can upload them in the Document Analysis section, where I can extract key information and provide a summary. Would you like to try that now?";
+                        this.activeTab = 'documents';
+                    }
+                    else if (queryLower.includes('hello') || queryLower.includes('hi')) {
+                        response = "Hello! I'm your banking process assistant. I can help you find information about specific banking procedures, troubleshoot issues, or analyze documents. How can I assist you today?";
+                    }
+                    else if (queryLower.includes('where') || queryLower.includes('find') || queryLower.includes('how to')) {
+                        response = "I'll help you locate that information. Can you provide a bit more detail about which specific banking process or feature you're looking for? For example, are you trying to find information about transfers, accounts, loans, or something else?";
+                    }
+                    else {
+                        response = "I understand you're looking for assistance with banking processes. To help you more effectively, could you please specify which banking process you're interested in? For example: mortgage applications, fund transfers, account authentication, or document analysis?";
+                    }
+                    
+                    this.simulateResponse(response);
+                },
+                
+                quickQuestion(question) {
+                    this.chatMessages.push({
+                        sender: 'user',
+                        text: question
+                    });
+                    
+                    // Show typing indicator
+                    this.isTyping = true;
+                    
+                    // Simulate response after delay
+                    setTimeout(() => {
+                        this.isTyping = false;
+                        this.generateResponse(question);
+                    }, 1000 + Math.random() * 1000);
+                },
+                
+                triggerFileUpload() {
+                    document.getElementById('fileUpload').click();
+                },
+                
+                handleFileUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    // Add file to documents list
+                    this.uploadedDocuments.push({
+                        name: file.name,
+                        size: this.formatFileSize(file.size),
+                        type: file.type,
+                        date: new Date().toLocaleDateString()
+                    });
+                    
+                    // Clear file input
+                    event.target.value = '';
+                },
+                
+                formatFileSize(bytes) {
+                    if (bytes < 1024) return bytes + ' bytes';
+                    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                    else return (bytes / 1048576).toFixed(1) + ' MB';
+                },
+                
+                analyzeDocument(doc) {
+                    // Simulate document analysis
+                    this.documentAnalysis = null;
+                    
+                    // Add a small delay to simulate processing
+                    setTimeout(() => {
+                        // Generate different analysis results depending on the filename
+                        if (doc.name.toLowerCase().includes('statement')) {
+                            this.documentAnalysis = {
+                                keyPoints: [
+                                    "Account balance: $24,567.89",
+                                    "Recent large transaction on " + new Date().toLocaleDateString(),
+                                    "2 ATM withdrawals totaling $600",
+                                    "Monthly account fee: $12.95"
+                                ],
+                                financialData: {
+                                    "Current Balance": "24,567.89",
+                                    "Previous Balance": "23,450.75",
+                                    "Total Deposits": "3,245.67",
+                                    "Total Withdrawals": "2,128.53"
+                                },
+                                summary: "This bank statement shows a healthy balance with regular deposits and withdrawals. The account has increased by $1,117.14 during this period. There were no overdraft charges or unusual activity detected."
+                            };
+                        } 
+                        else if (doc.name.toLowerCase().includes('report')) {
+                            this.documentAnalysis = {
+                                keyPoints: [
+                                    "Portfolio performance: +8.2% YTD",
+                                    "Asset allocation: 60% equity, 30% fixed income, 10% alternatives",
+                                    "Dividend income: $1,876.45",
+                                    "Tax-loss harvesting opportunity identified"
+                                ],
+                                financialData: {
+                                    "Total Value": "324,789.56",
+                                    "Annual Return": "8.20",
+                                    "Dividend Yield": "2.35",
+                                    "Management Fee": "0.75"
+                                },
+                                summary: "This investment report shows moderate growth in line with market performance. Your asset allocation remains well-diversified. Consider rebalancing in the coming quarter as your equity allocation has drifted slightly above target."
+                            };
+                        }
+                        else {
+                            this.documentAnalysis = {
+                                keyPoints: [
+                                    "Account balance: $24,567.89",
+                                    "Recent large transaction on " + new Date().toLocaleDateString(),
+                                    "Investment portfolio growth: 8.2% YTD",
+                                    "Tax-free contribution room remaining: $12,500"
+                                ],
+                                financialData: {
+                                    "Current Balance": "24,567.89",
+                                    "Monthly Deposits": "1,200.00",
+                                    "Interest Rate": "3.25",
+                                    "Annual Fee": "120.00"
+                                },
+                                summary: "This financial document shows a healthy account with consistent monthly deposits. The current interest rate is competitive at 3.25%. There have been no unusual withdrawals in the past quarter. Consider increasing your monthly contributions to maximize long-term growth."
+                            };
+                        }
+                    }, 1000);
+                },
+                
+                getProcessTitle(processId) {
+                    const titles = {
+                        'loan': 'Mortgage Application Process',
+                        'account': 'Account Opening Process',
+                        'transfer': 'Fund Transfer Issues Resolution',
+                        'credit': 'Credit Card Application Process',
+                        'rrsp': 'RRSP Withdrawal Process',
+                        'auth': 'Account Authentication Problem Resolution'
+                    };
+                    return titles[processId] || 'Process Details';
+                },
+                
+                searchProcesses() {
+                    if (!this.processSearch.trim()) {
+                        this.processList = [];
+                        return;
+                    }
+                    
+                    this.isProcessLoading = true;
+                    
+                    // Simulate backend search
+                    setTimeout(() => {
+                        const searchTerm = this.processSearch.toLowerCase();
+                        
+                        // Define a comprehensive list of processes to search through
+                        const allProcesses = [
+                            { name: 'Mortgage Application Process', value: 'loan' },
+                            { name: 'RRSP Withdrawal Process', value: 'rrsp' },
+                            { name: 'Fund Transfer Issues Resolution', value: 'transfer' },
+                            { name: 'Credit Card Application Process', value: 'credit' },
+                            { name: 'Account Opening Process', value: 'account' },
+                            { name: 'Debit Card Replacement', value: 'debit' },
+                            { name: 'Online Banking Password Reset', value: 'password' },
+                            { name: 'Account Authentication Problem Resolution', value: 'auth' },
+                            { name: 'International Wire Transfer Process', value: 'wire' },
+                            { name: 'Check Deposit Process', value: 'check' },
+                            { name: 'Line of Credit Application', value: 'loc' },
+                            { name: 'Investment Account Setup', value: 'investment' }
+                        ];
+                        
+                        // Filter processes based on search term
+                        this.processList = allProcesses.filter(process => 
+                            process.name.toLowerCase().includes(searchTerm)
+                        );
+                        
+                        // If no exact matches but search is about authentication/login/password
+                        if (this.processList.length === 0 && 
+                            (searchTerm.includes('login') || 
+                             searchTerm.includes('password') || 
+                             searchTerm.includes('account locked') || 
+                             searchTerm.includes('can\'t sign in'))) {
+                            this.processList = [
+                                { name: 'Account Authentication Problem Resolution', value: 'auth' },
+                                { name: 'Online Banking Password Reset', value: 'password' }
+                            ];
+                        }
+                        
+                        // If no exact matches but search is about transfers/payments
+                        if (this.processList.length === 0 && 
+                            (searchTerm.includes('transfer') || 
+                             searchTerm.includes('payment') || 
+                             searchTerm.includes('send money'))) {
+                            this.processList = [
+                                { name: 'Fund Transfer Issues Resolution', value: 'transfer' },
+                                { name: 'International Wire Transfer Process', value: 'wire' }
+                            ];
+                        }
+                        
+                        this.isProcessLoading = false;
+                        
+                        // Auto-select the first result if there is one
+                        if (this.processList.length > 0) {
+                            this.selectedProcess = this.processList[0].value;
+                        }
+                    }, 800);
+                },
+                
+                getProcessSteps() {
+                    // Show loading while fetching steps
+                    if (this.isProcessLoading) {
+                        return [];
+                    }
+                    
+                    // Return steps based on selected process
+                    if (this.selectedProcess === 'loan') {
+                        return [
+                            {
+                                title: 'Check Eligibility Requirements',
+                                description: 'Verify your credit score, income stability, and down payment amount. For Canadian mortgages, you typically need a minimum credit score of 680 and a down payment of at least 5%.',
+                                location: 'Knowledge Center > Mortgage > Eligibility Requirements',
+                                tips: 'You can check your credit score for free through your bank\'s online banking portal under "Account Services".'
+                            },
+                            {
+                                title: 'Get Pre-Approved',
+                                description: 'Visit your bank or a mortgage broker to get pre-approved. This step involves reviewing your financial information and determining how much you can borrow.',
+                                location: 'Online Banking > Products > Mortgages > Apply Now',
+                                screenshot: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                                tips: 'Pre-approval is typically valid for 90-120 days, so plan your house hunting accordingly.'
+                            },
+                            {
+                                title: 'Find a Property',
+                                description: 'Work with a real estate agent to find a property that meets your needs and budget based on your pre-approval amount.',
+                                location: 'Not applicable - external process'
+                            },
+                            {
+                                title: 'Make an Offer',
+                                description: 'When you find a suitable property, make an offer through your real estate agent. If accepted, you'll need to provide a deposit.',
+                                location: 'Not applicable - external process'
+                            },
+                            {
+                                title: 'Finalize Mortgage Application',
+                                description: 'Submit your final mortgage application with the property details. The bank will require property information, purchase agreement, and may request an appraisal.',
+                                location: 'Online Banking > Products > Mortgages > My Applications > Continue Application',
+                                tips: 'Be sure to arrange for home inspection before finalizing your purchase.',
+                                troubleshooting: 'If your application shows "Pending Documents" status, check the Documents Required section and upload any missing items.'
+                            },
+                            {
+                                title: 'Closing Process',
+                                description: 'Work with a lawyer to review and sign all legal documents. Pay closing costs, which typically include legal fees, land transfer taxes, and title insurance.',
+                                location: 'Branch locations or lawyer\'s office',
+                                screenshot: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+                            }
+                        ];
+                    } else if (this.selectedProcess === 'rrsp') {
+                        return [
+                            {
+                                title: 'Access Your RRSP Account',
+                                description: 'Log in to your online banking portal and navigate to your RRSP account details page.',
+                                location: 'Online Banking > Investments > RRSP Accounts',
+                                tips: 'You can also initiate this process through mobile banking app under the Investments tab.'
+                            },
+                            {
+                                title: 'Select Withdrawal Option',
+                                description: 'Choose between regular withdrawal (taxable) or special programs like Home Buyers\' Plan (HBP) or Lifelong Learning Plan (LLP) which allow tax-free withdrawals with repayment requirements.',
+                                location: 'Online Banking > Investments > RRSP Accounts > Account Actions > Withdraw Funds',
+                                screenshot: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80'
+                            },
+                            {
+                                title: 'Complete Withdrawal Form',
+                                description: 'Fill out the RRSP withdrawal form with withdrawal amount, destination account, and purpose of withdrawal (if applicable for special programs).',
+                                location: 'Online Banking > Investments > RRSP Accounts > Account Actions > Withdraw Funds > Form',
+                                tips: 'For regular withdrawals, withholding tax will be applied (10-30% depending on amount).',
+                                troubleshooting: 'If you encounter "Service Unavailable" error, try using a different browser or clearing your cache.'
+                            },
+                            {
+                                title: 'Review Tax Implications',
+                                description: 'Review the automatically calculated tax withholding amount and net withdrawal amount. For regular withdrawals, confirm you understand that RRSP withdrawals are added to your taxable income for the year.',
+                                location: 'Online Banking > Investments > RRSP Accounts > Account Actions > Withdraw Funds > Review'
+                            },
+                            {
+                                title: 'Confirm and Submit',
+                                description: 'Verify all information is correct, check the acknowledgment boxes regarding tax implications, and submit your request.',
+                                location: 'Online Banking > Investments > RRSP Accounts > Account Actions > Withdraw Funds > Confirm',
+                                troubleshooting: 'If the confirmation button is grayed out, ensure all required fields and acknowledgments are completed.'
+                            },
+                            {
+                                title: 'Receive Funds',
+                                description: 'Once processed, funds will be deposited to your specified account, typically within 3-5 business days.',
+                                location: 'Online Banking > Accounts > Transaction History'
+                            }
+                        ];
+                    } else if (this.selectedProcess === 'transfer') {
+                        return [
+                            {
+                                title: 'Identify Transfer Issue',
+                                description: 'Determine what type of transfer issue you\'re experiencing: failed transfer, delayed processing, wrong amount, or wrong recipient.',
+                                location: 'Online Banking > Payments & Transfers > Transfer History',
+                                tips: 'Look for status indicators like "Pending", "Completed", or "Failed" next to each transaction.'
+                            },
+                            {
+                                title: 'Check Transaction Details',
+                                description: 'Locate and review the specific transfer in question to confirm details like amount, recipient, date, and current status.',
+                                location: 'Online Banking > Payments & Transfers > Transfer History > [Select Specific Transfer]',
+                                screenshot: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                                troubleshooting: 'If you don\'t see the transfer in history, check if you selected the correct date range and account.'
+                            },
+                            {
+                                title: 'Verify Account Balances',
+                                description: 'Check your account balance to confirm if funds were deducted. For incoming transfers, verify if the funds have been received.',
+                                location: 'Online Banking > Accounts > Account Details',
+                                tips: 'Remember that some transfers may show as "pending" for 1-3 business days before fully processing.'
+                            },
+                            {
+                                title: 'Use Self-Service Resolution',
+                                description: 'For eligible transfer issues, you can use the self-service options to cancel pending transfers, resend transfer notifications, or correct recipient information.',
+                                location: 'Online Banking > Payments & Transfers > Transfer History > [Select Transfer] > Problem with this Transfer',
+                                troubleshooting: 'If the self-service options are not available, it may mean the transfer has already processed or exceeded the time window for changes.'
+                            },
+                            {
+                                title: 'Contact Customer Support',
+                                description: 'If self-service options don\'t resolve your issue, contact customer support through secure messaging, phone, or in-branch visit.',
+                                location: 'Online Banking > Support > Contact Us or Call 1-800-XXX-XXXX',
+                                tips: 'Have your transfer confirmation number ready when contacting support for faster service.'
+                            }
+                        ];
+                    } else if (this.selectedProcess === 'auth') {
+                        return [
+                            {
+                                title: 'Access Account Recovery',
+                                description: 'From the login page, click on "Forgot Password" or "Need Help?" to begin the account recovery process.',
+                                location: 'Login Page > Need Help? > Forgot Password/Username',
+                                tips: 'Make sure you\'re on the official bank website by checking the URL and security indicators.'
+                            },
+                            {
+                                title: 'Identify Yourself',
+                                description: 'Enter your username, card number, or account number to identify your account.',
+                                location: 'Login Recovery Page > Step 1',
+                                troubleshooting: 'If you\'ve forgotten both username and password, select "Forgot Username" first, then proceed with password recovery.'
+                            },
+                            {
+                                title: 'Verify Your Identity',
+                                description: 'Complete the multi-factor authentication by receiving and entering a verification code sent to your registered email or phone number.',
+                                location: 'Login Recovery Page > Step 2',
+                                screenshot: 'https://images.unsplash.com/photo-1496096265110-f83ad7f96608?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                                troubleshooting: 'If you\'re not receiving the verification code, check your spam folder or try an alternate verification method if available.'
+                            },
+                            {
+                                title: 'Answer Security Questions',
+                                description: 'Correctly answer your pre-set security questions to further confirm your identity.',
+                                location: 'Login Recovery Page > Step 3',
+                                tips: 'Answers are case-sensitive and must match exactly what you originally provided.'
+                            },
+                            {
+                                title: 'Create New Password',
+                                description: 'Create a new password following the security guidelines. Your password should be strong and unique.',
+                                location: 'Login Recovery Page > Step 4',
+                                tips: 'Use a combination of uppercase and lowercase letters, numbers, and special characters for a strong password.',
+                                troubleshooting: 'If your password is rejected, ensure it meets all the requirements shown on screen (length, complexity, etc.).'
+                            },
+                            {
+                                title: 'Log In With New Credentials',
+                                description: 'Return to the login page and sign in using your username and newly created password.',
+                                location: 'Main Login Page',
+                                tips: 'For security reasons, you may be prompted to verify your identity again on first login with new credentials.'
+                            }
+                        ];
+                    } else {
+                        // Default steps for other processes
+                        return [
+                            {
+                                title: 'Initial Step',
+                                description: 'Access the appropriate section in online banking to begin the process.',
+                                location: 'Online Banking > Main Menu',
+                                tips: 'Make sure you have all required documents ready before starting.'
+                            },
+                            {
+                                title: 'Input Information',
+                                description: 'Provide the necessary details and documentation as prompted by the system.',
+                                location: 'Process-specific section in Online Banking'
+                            },
+                            {
+                                title: 'Review and Confirm',
+                                description: 'Carefully review all information for accuracy before submitting.',
+                                location: 'Review page of the process',
+                                screenshot: 'https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+                                troubleshooting: 'If you encounter any errors, check that all required fields are completed correctly.'
+                            },
+                            {
+                                title: 'Process Completion',
+                                description: 'Receive confirmation and any next steps or instructions.',
+                                location: 'Confirmation page',
+                                tips: 'Save or print your confirmation for your records.'
+                            }
+                        ];
+                    }
+                },
+                
+                fetchAlumniData() {
+                    this.alumniLoading = true;
+                    
+                    // Use PapaParse to fetch and parse the CSV
+                    Papa.parse('https://db.zetaverse.one/storage/v1/object/public/app-uploads/spreadsheet-1743331677241/J9uowRjEp4gc8kEdFlfxG2c8RQJ3/zp8046u8.csv', {
+                        download: true,
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            this.alumniData = results.data;
+                            this.filteredAlumni = this.alumniData.slice(0, this.displayLimit);
+                            
+                            // Extract unique regions and industries for filters
+                            this.extractFilterOptions();
+                            
+                            this.alumniLoading = false;
+                            
+                            // Initialize alumni chart
+                            this.$nextTick(() => {
+                                this.initAlumniChart();
+                            });
+                        },
+                        error: (error) => {
+                            console.error('Error parsing CSV:', error);
+                            this.alumniLoading = false;
+                            
+                            // Fallback to sample data
+                            this.loadSampleAlumniData();
+                        }
+                    });
+                },
+                
+                loadSampleAlumniData() {
+                    // Sample alumni data as fallback
+                    const sampleData = [
+                        {
+                            "Name": "Muhammed Shahjahan NP",
+                            "Email": "shajinp@eim.ae",
+                            "Permanent Address (India)": "NP House, Chamravattom P.O, Tirur, Malappuram Dis",
+                            "Local Address (UAE)": "Al Mankhool, Burdubai, Dubai",
+                            "Local Contact Number": "050 4567048",
+                            "WhatsApp Number": "050 4567048",
+                            "Contact Number (India)": "9846688266",
+                            "Emirate/Region of Living": "Dubai",
+                            "Company Name": "",
+                            "Designation": "",
+                            "Industry": "Banking",
+                            "Qualification": "MBA",
+                            "Period of stay in MMA (MM/YYYY - MM/YYYY)": "Aug 1993 to April 1998",
+                            "Which MMA hostel you were in?": "Pudupet",
+                            "Blood Group": "AB+ve",
+                            "Are you interested to be added UAE MMA Alumni WhatsApp group?": "Yes",
+                            "Any Message to the committee?": "",
+                            "Please upload your Photo": ""
+                        },
+                        {
+                            "Name": "Arun Kumar",
+                            "Email": "arun.kumar@example.com",
+                            "Permanent Address (India)": "123 Main St, Mumbai",
+                            "Local Address (UAE)": "Al Barsha, Dubai",
+                            "Local Contact Number": "050 1234567",
+                            "WhatsApp Number": "050 1234567",
+                            "Contact Number (India)": "9876543210",
+                            "Emirate/Region of Living": "Dubai",
+                            "Company Name": "ABC Corp",
+                            "Designation": "Manager",
+                            "Industry": "Technology",
+                            "Qualification": "BBA",
+                            "Period of stay in MMA (MM/YYYY - MM/YYYY)": "Sep 2001 to June 2005",
+                            "Which MMA hostel you were in?": "Adyar",
+                            "Blood Group": "O+ve",
+                            "Are you interested to be added UAE MMA Alumni WhatsApp group?": "Yes",
+                            "Any Message to the committee?": "Looking forward to connecting with everyone",
+                            "Please upload your Photo": ""
+                        },
+                        {
+                            "Name": "Priya Sharma",
+                            "Email": "priya.sharma@example.com",
+                            "Permanent Address (India)": "456 Park Ave, Delhi",
+                            "Local Address (UAE)": "Jumeirah, Dubai",
+                            "Local Contact Number": "050 7654321",
+                            "WhatsApp Number": "050 7654321",
+                            "Contact Number (India)": "8765432109",
+                            "Emirate/Region of Living": "Dubai",
+                            "Company Name": "XYZ Ltd",
+                            "Designation": "Director",
+                            "Industry": "Finance",
+                            "Qualification": "MBA, CFA",
+                            "Period of stay in MMA (MM/YYYY - MM/YYYY)": "Aug 1999 to Mar 2003",
+                            "Which MMA hostel you were in?": "Adyar",
+                            "Blood Group": "A+ve",
+                            "Are you interested to be added UAE MMA Alumni WhatsApp group?": "Yes",
+                            "Any Message to the committee?": "",
+                            "Please upload your Photo": ""
+                        }
+                    ];
+                    
+                    this.alumniData = sampleData;
+                    this.filteredAlumni = sampleData;
+                    this.extractFilterOptions();
+                    
+                    // Initialize alumni chart
+                    this.$nextTick(() => {
+                        this.initAlumniChart();
+                    });
+                },
+                
+                extractFilterOptions() {
+                    // Extract unique regions
+                    const regions = new Set();
+                    this.alumniData.forEach(alumni => {
+                        if (alumni['Emirate/Region of Living']) {
+                            regions.add(alumni['Emirate/Region of Living']);
+                        }
+                    });
+                    this.regions = [...regions].sort();
+                    
+                    // Extract unique industries
+                    const industries = new Set();
+                    this.alumniData.forEach(alumni => {
+                        if (alumni.Industry) {
+                            industries.add(alumni.Industry);
+                        }
+                    });
+                    this.industries = [...industries].sort();
+                    
+                    // Extract unique hostels
+                    const hostels = new Set();
+                    this.alumniData.forEach(alumni => {
+                        if (alumni['Which MMA hostel you were in?']) {
+                            hostels.add(alumni['Which MMA hostel you were in?']);
+                        }
+                    });
+                    this.hostels = [...hostels].sort();
+                },
+                
+                initAlumniChart() {
+                    // Create region distribution chart
+                    const canvas = document.getElementById('alumniChart');
+                    if (!canvas) return;
+                    
+                    // Clear any existing chart
+                    if (Chart.getChart("alumniChart")) {
+                        Chart.getChart("alumniChart").destroy();
+                    }
+                    
+                    // Count alumni by region
+                    const regionCounts = {};
+                    this.alumniData.forEach(alumni => {
+                        const region = alumni['Emirate/Region of Living'] || 'Unknown';
+                        if (regionCounts[region]) {
+                            regionCounts[region]++;
+                        } else {
+                            regionCounts[region] = 1;
+                        }
+                    });
+                    
+                    // Convert to chart data
+                    const labels = Object.keys(regionCounts).slice(0, 5); // Top 5 regions
+                    const data = labels.map(label => regionCounts[label]);
+                    const colors = [
+                        '#0066cc', '#5d9cec', '#b0c4e8', '#2980b9', '#4896d6'
+                    ];
+                    
+                    // Create chart
+                    this.alumniChart = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Alumni by Region',
+                                data: data,
+                                backgroundColor: colors,
+                                borderColor: '#000',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Top Regions',
+                                    font: {
+                                        family: 'Space Grotesk',
+                                        size: 14
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                }
+                            }
+                        }
+                    });
+                },
+                
+                applyAlumniFilters() {
+                    const filtered = this.alumniData.filter(alumni => {
+                        // Region filter
+                        if (this.alumniFilters.region && alumni['Emirate/Region of Living'] !== this.alumniFilters.region) {
+                            return false;
+                        }
+                        
+                        // Industry filter
+                        if (this.alumniFilters.industry && alumni.Industry !== this.alumniFilters.industry) {
+                            return false;
+                        }
+                        
+                        // Hostel filter
+                        if (this.alumniFilters.hostel && alumni['Which MMA hostel you were in?'] !== this.alumniFilters.hostel) {
+                            return false;
+                        }
+                        
+                        // Year filter
+                        if (this.alumniFilters.yearFrom || this.alumniFilters.yearTo) {
+                            const periodText = alumni['Period of stay in MMA (MM/YYYY - MM/YYYY)'] || '';
+                            const yearMatches = periodText.match(/\d{4}/g);
+                            
+                            if (yearMatches && yearMatches.length) {
+                                const years = yearMatches.map(y => parseInt(y));
+                                const startYear = Math.min(...years);
+                                const endYear = Math.max(...years);
+                                
+                                if (this.alumniFilters.yearFrom && startYear < parseInt(this.alumniFilters.yearFrom)) {
+                                    return false;
+                                }
+                                
+                                if (this.alumniFilters.yearTo && endYear > parseInt(this.alumniFilters.yearTo)) {
+                                    return false;
+                                }
+                            } else if (this.alumniFilters.yearFrom || this.alumniFilters.yearTo) {
+                                // If we can't parse years but year filter is active, exclude this record
+                                return false;
+                            }
+                        }
+                        
+                        // Search filter
+                        if (this.alumniFilters.search) {
+                            const searchTerm = this.alumniFilters.search.toLowerCase();
+                            const nameMatch = (alumni.Name || '').toLowerCase().includes(searchTerm);
+                            const emailMatch = (alumni.Email || '').toLowerCase().includes(searchTerm);
+                            const companyMatch = (alumni['Company Name'] || '').toLowerCase().includes(searchTerm);
+                            
+                            if (!nameMatch && !emailMatch && !companyMatch) {
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // Apply sorting
+                    const sortedData = this.applySorting(filtered);
+                    
+                    this.filteredAlumni = sortedData.slice(0, this.displayLimit);
+                },
+                
+                applySorting(data) {
+                    if (this.alumniSort === 'nameAsc') {
+                        return [...data].sort((a, b) => a.Name.localeCompare(b.Name));
+                    } else if (this.alumniSort === 'nameDesc') {
+                        return [...data].sort((a, b) => b.Name.localeCompare(a.Name));
+                    } else if (this.alumniSort === 'recent') {
+                        // Simulate recently added (in real app, would use timestamp)
+                        return [...data].reverse();
+                    } else if (this.alumniSort === 'region') {
+                        return [...data].sort((a, b) => {
+                            const regionA = a['Emirate/Region of Living'] || '';
+                            const regionB = b['Emirate/Region of Living'] || '';
+                            return regionA.localeCompare(regionB);
+                        });
+                    }
+                    
+                    return data;
+                },
+                
+                loadMoreAlumni() {
+                    const currentCount = this.filteredAlumni.length;
+                    const nextBatch = this.alumniData.filter(alumni => {
+                        // Apply the same filters as in applyAlumniFilters
+                        // Region filter
+                        if (this.alumniFilters.region && alumni['Emirate/Region of Living'] !== this.alumniFilters.region) {
+                            return false;
+                        }
+                        
+                        // Industry filter
+                        if (this.alumniFilters.industry && alumni.Industry !== this.alumniFilters.industry) {
+                            return false;
+                        }
+                        
+                        // Hostel filter
+                        if (this.alumniFilters.hostel && alumni['Which MMA hostel you were in?'] !== this.alumniFilters.hostel) {
+                            return false;
+                        }
+                        
+                        // Search filter
+                        if (this.alumniFilters.search) {
+                            const searchTerm = this.alumniFilters.search.toLowerCase();
+                            const nameMatch = (alumni.Name || '').toLowerCase().includes(searchTerm);
+                            const emailMatch = (alumni.Email || '').toLowerCase().includes(searchTerm);
+                            const companyMatch = (alumni['Company Name'] || '').toLowerCase().includes(searchTerm);
+                            
+                            if (!nameMatch && !emailMatch && !companyMatch) {
+                                return false;
+                            }
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // Apply sorting
+                    const sortedData = this.applySorting(nextBatch);
+                    
+                    this.filteredAlumni = sortedData.slice(0, currentCount + 8);
+                    
+                    // Update chart with new filter results
+                    this.$nextTick(() => {
+                        this.initAlumniChart();
+                    });
+                },
+                
+                triggerCSVUpload() {
+                    document.getElementById('csvUpload').click();
+                },
+                
+                handleCSVUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    this.alumniLoading = true;
+                    
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => {
+                            this.alumniData = results.data;
+                            this.filteredAlumni = this.alumniData.slice(0, this.displayLimit);
+                            
+                            // Extract unique regions and industries for filters
+                            this.extractFilterOptions();
+                            
+                            this.alumniLoading = false;
+                            
+                            // Update chart with new data
+                            this.$nextTick(() => {
+                                this.initAlumniChart();
+                            });
+                        },
+                        error: (error) => {
+                            console.error('Error parsing CSV:', error);
+                            this.alumniLoading = false;
+                        }
+                    });
+                    
+                    // Clear file input
+                    event.target.value = '';
+                },
+                
+                addNewAlumni() {
+                    if (!this.newAlumni.name || !this.newAlumni.email) {
+                        alert('Name and Email are required fields');
+                        return;
+                    }
+                    
+                    // Create alumni object with the same structure as CSV data
+                    const alumni = {
+                        "Name": this.newAlumni.name,
+                        "Email": this.newAlumni.email,
+                        "Permanent Address (India)": this.newAlumni.permanentAddress,
+                        "Local Address (UAE)": this.newAlumni.localAddress,
+                        "Local Contact Number": this.newAlumni.contact,
+                        "WhatsApp Number": this.newAlumni.contact,
+                        "Emirate/Region of Living": this.newAlumni.region,
+                        "Industry": this.newAlumni.industry,
+                        "Period of stay in MMA (MM/YYYY - MM/YYYY)": this.newAlumni.period,
+                        "Which MMA hostel you were in?": this.newAlumni.hostel,
+                        "Blood Group": this.newAlumni.bloodGroup
+                    };
+                    
+                    // Add to data
+                    this.alumniData.unshift(alumni);
+                    this.applyAlumniFilters();
+                    
+                    // Reset form
+                    this.newAlumni = {
+                        name: '',
+                        email: '',
+                        region: '',
+                        contact: '',
+                        industry: '',
+                        period: '',
+                        hostel: '',
+                        bloodGroup: '',
+                        localAddress: '',
+                        permanentAddress: ''
+                    };
+                    
+                    this.showAddAlumniForm = false;
+                    
+                    // Update chart with new data
+                    this.$nextTick(() => {
+                        this.initAlumniChart();
+                    });
+                },
+                
+                viewAlumniDetails(alumni) {
+                    this.selectedAlumni = alumni;
+                },
+                
+                editAlumni(alumni) {
+                    // In a real app, this would open an edit form pre-filled with alumni data
+                    if (this.selectedAlumni) {
+                        this.selectedAlumni = null;
+                    }
+                    
+                    this.newAlumni = {
+                        name: alumni.Name || '',
+                        email: alumni.Email || '',
+                        region: alumni['Emirate/Region of Living'] || '',
+                        contact: alumni['Local Contact Number'] || '',
+                        industry: alumni.Industry || '',
+                        period: alumni['Period of stay in MMA (MM/YYYY - MM/YYYY)'] || '',
+                        hostel: alumni['Which MMA hostel you were in?'] || '',
+                        bloodGroup: alumni['Blood Group'] || '',
+                        localAddress: alumni['Local Address (UAE)'] || '',
+                        permanentAddress: alumni['Permanent Address (India)'] || ''
+                    };
+                    
+                    this.showAddAlumniForm = true;
+                },
+                
+                exportAlumniData() {
+                    // Convert filtered alumni data to CSV
+                    const csv = Papa.unparse(this.filteredAlumni);
+                    
+                    // Create download link
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'alumni_export_' + new Date().toISOString().slice(0, 10) + '.csv';
+                    
+                    // Trigger download
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
